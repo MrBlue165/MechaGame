@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+
 public class UIPlayer : MonoBehaviour
 {
        // Grid size
@@ -11,10 +12,24 @@ public class UIPlayer : MonoBehaviour
     
     private int secondGridSizeX = 1;
     private int secondGridSizeY = 3;
+    private List<string> playerAbilities = new List<string>();
+    private List<string> playerSpecials = new List<string>();
+    private List<Transform> childs = new List<Transform>();
+    
+    Entity player = null;
+    
     // Grid to represent occupied cells (true means occupied, false means empty)
     private bool[,] grid;
 
+    enum GameState
+    {
+        PlayerTurn,
+        EnemyTurn
+    }
+    
+    GameState currentGameState;
     private int currentGrid = 0;
+    private int selection = 0;
     // Cursor position
     private int currentX = 0;
     private int currentY = 0;
@@ -26,74 +41,176 @@ public class UIPlayer : MonoBehaviour
 
     void Start()
     {
+        currentGameState = GameState.PlayerTurn;
+        Entity enemy = EnemyFind();
+        enemy.abilities.Add(new Ability("Cannon Shot", 5, 5, 0, 0.8));
+        
+        
+        player = FindPlayer();
+        if(player != null)
+        {  
+            player.abilities.Add(new Ability("Cannon Shot", 5, 5, 0, 0.8));
+            player.abilities.Add(new Ability("Minigun", 4, 6, 2, 1));
+            foreach (var ability in player.abilities)
+            {
+                playerAbilities.Add(ability.abilityName);
+            }
+            player.abilities.Add(new Ability("Heal", -5, 3, 0, 1));
+            player.abilities.Add(new Ability("Tank Fuel", 0, -5, 0, 1));
+            playerSpecials.Add("Heal");
+            playerSpecials.Add("Tank Fuel");
+            
+        }
+
+        
         // Initialize the grid with false (empty) or true (occupied)
         grid = new bool[gridSizeX, gridSizeY];
         
-        
+        grid[0,0] = true;
+        grid[0,1] = true;
         // Initialize gridObjects array and reference child objects
         gridObjects = new GameObject[gridSizeX, gridSizeY];
         gridObjects2 = new GameObject[secondGridSizeX, secondGridSizeY];
 
-        // Find child objects and assign them based on name (assuming the objects are named 0,1,2,10,11,12,20,21,22)
+        InitializeGridObjects(gridSizeX, gridSizeY, gridObjects, Color.blue, true);
+        InitializeGridObjects(secondGridSizeX, secondGridSizeY, gridObjects2, Color.green, false);
+        UpdateGridVisuals();
+    }
+    
+    private void InitializeGridObjects(int gridSizeX, int gridSizeY, GameObject[,] gridObjects, Color defaultColor, bool isOne)
+    {
         for (int i = 0; i < gridSizeX; i++)
         {
             for (int j = 0; j < gridSizeY; j++)
             {
-                string objectName = $"{i}{j}"; // Names like "00", "01", "02", etc.
+                string objectName = $"{j}";
+                if (isOne == true) objectName = $"{i}{j}";
                 Transform child = transform.Find(objectName);
+                if (isOne == true) childs.Add(child);
+                
+                
                 if (child != null)
                 {
                     gridObjects[i, j] = child.gameObject;
 
-                    // Example: Set the initial color based on the occupied state
                     SpriteRenderer sr = child.GetComponent<SpriteRenderer>();
                     if (sr != null)
                     {
-                        sr.color = Color.blue; // Set default color
+                        sr.color = defaultColor; // Set color based on the passed parameter
                     }
+
+                    // Optionally display ability name in Grid 2
+                    
                 }
             }
         }
-        // Find child objects and assign them based on name (assuming the objects are named 0,1,2,10,11,12,20,21,22)
-        for (int i = 0; i < secondGridSizeX; i++)
+        if (player != null && isOne == true)
         {
-            for (int j = 0; j < secondGridSizeY; j++)
+            AbilityTextGrid();
+        }
+        else
+        {
+            
+        }
+        
+    }
+    
+    private void AbilityTextGrid()
+    {
+        int count = 0;
+        if (currentGrid == 0)
+        {
+            foreach (var child in childs)
             {
-                string objectName = $"{j}";
-                Transform child = transform.Find(objectName);
                 if (child != null)
                 {
-                    gridObjects2[i, j] = child.gameObject;
-
-                    // Example: Set the initial color based on the occupied state
-                    SpriteRenderer sr = child.GetComponent<SpriteRenderer>();
-                    if (sr != null)
+                    TMPro.TextMeshProUGUI text = child.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                    if (text != null)
                     {
-                        sr.color = Color.green; // Set default color
+                        text.text = "";
                     }
                 }
+                
             }
         }
-        // Example of setting some cells as occupied
-        grid[0, 0] = true;  
-        grid[0, 1] = true;  
-        grid[0, 2] = true;  
-        grid[1, 0] = true; 
-        grid[1, 1] = false;  
-        grid[1, 2] = true;
-        grid[2, 0] = true; 
-        grid[2, 1] = true;  
-        grid[2, 2] = true;
-
-       
+        else
+        {
+            foreach (var child in childs)
+            {
+               string childName = child.name;
+               int x = int.Parse(childName[0].ToString());
+               int y = int.Parse(childName[1].ToString());
+                                               
+               if (child != null && selection == 1)
+               {
+                   if (count < playerAbilities.Count)
+                   {
+                       TMPro.TextMeshProUGUI text = child.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                       if (text != null)
+                       {
+                           text.text = playerAbilities[count];
+                                                       
+                       }
+                                                   
+                                              
+                       grid[x, y] = true;
+                   }
+                   else grid[x, y] = false;
+               }
+               else if (child != null && selection == 0)
+               {
+                   if (count < playerSpecials.Count)
+                   {
+                       TMPro.TextMeshProUGUI text = child.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                       if (text != null)
+                       {
+                           text.text = playerSpecials[count];
+                                                       
+                       }
+                                                   
+                                              
+                       grid[x, y] = true;
+                   }
+                   else grid[x, y] = false;
+               }
+               count++;                                        
+                                
+                            
+            }
+        }
+        
+        
     }
+
 
     void Update()
     {
         HandleMovement();
         HandleSelect();
+        AbilityTextGrid();
+        if (currentGameState == GameState.EnemyTurn)
+        {
+            EnemyTurn();    
+        }
+        
     }
 
+    void EnemyTurn()
+    {
+        var enemy = EnemyFind();
+        if (enemy.abilities.Count > 0)
+        {
+            int randomIndex = UnityEngine.Random.Range(0, enemy.abilities.Count);
+            var randomAbility = enemy.abilities[randomIndex];
+
+            // Use the randomAbility here
+            Debug.Log("Enemy used ability: " + randomAbility.abilityName);
+            // You probably want to execute the ability
+            enemy.UseAbility(randomAbility, player);
+        }
+        
+        currentGameState = GameState.PlayerTurn;
+    }
     void HandleSelect()
     {
         PriorSelect();
@@ -104,15 +221,41 @@ public class UIPlayer : MonoBehaviour
 
         
         else return;
+
+        if (currentGrid == 1 && selection == 1)
+        {
+             Transform child = transform.Find($"{currentX}{currentY}");
+                    TMPro.TextMeshProUGUI text = child.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                    //get ability name from text
+                    Ability selectedAbility = player.abilities.Find(ability => ability.abilityName == text.text);
+
+                    Entity enemy = EnemyFind();
+                    
+                    player.UseAbility(selectedAbility, enemy);
+                    currentGameState = GameState.EnemyTurn;
+        }
+        else if (currentGrid == 1 && selection == 0)
+        {
+            Transform child = transform.Find($"{currentX}{currentY}");
+            TMPro.TextMeshProUGUI text = child.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+            //get ability name from text
+            Ability selectedAbility = player.abilities.Find(ability => ability.abilityName == text.text);
+            
+            
+            player.UseAbility(selectedAbility);
+            currentGameState = GameState.EnemyTurn;
+        }
         // Visualize cursor position
         if (currentGrid == 0)
         {
+            if(currentY == 0) selection = 0;
+            else selection = 1;
             currentGrid = 1;
             currentX=0; 
             currentY=0;
             UpdateGridVisuals();
         }
-        Debug.Log($"Cursor Position: ({currentX}, {currentY})");
+       
     }
 
     void PriorSelect()
@@ -143,7 +286,11 @@ public class UIPlayer : MonoBehaviour
             }
             else if (Input.GetKeyDown(KeyCode.DownArrow))
             {
-                AttemptMove(currentX, currentY + 1, "down");
+                if (!(currentY == 1 && playerAbilities.Count < 9))
+                {
+                    AttemptMove(currentX, currentY + 1, "down");
+                }
+                
             }
         }
         else if (currentGrid == 1)
@@ -212,63 +359,85 @@ public class UIPlayer : MonoBehaviour
         switch (direction)
         {
             case "up":
-                if (IsInBounds(targetX + 1, targetY) && grid[targetX + 1, targetY])
+                for (int i = 0; i < gridSizeX; i++)
                 {
-                    // Check below
-                    currentX = targetX + 1;
-                    currentY = targetY;
-                }
-                else if (IsInBounds(targetX - 1, targetY) && grid[targetX - 1, targetY])
-                {
-                    // Check left
-                    currentX = targetX - 1;
-                    currentY = targetY;
+                    if (IsInBounds(targetX + i, targetY) && grid[targetX + i, targetY])
+                    {
+                        // Check below
+                        currentX = targetX + i;
+                        currentY = targetY;
+                        break;
+                    }
+                    else if (IsInBounds(targetX - i, targetY) && grid[targetX - i, targetY])
+                    {
+                        // Check left
+                        currentX = targetX - i;
+                        currentY = targetY;
+                        break;
+                    }
                 }
                 break;
 
             case "down":
-                if (IsInBounds(targetX - 1, targetY) && grid[targetX - 1, targetY])
+                for (int i = 0; i < gridSizeX; i++)
                 {
-                    // Check right
-                    currentX = targetX - 1;
-                    currentY = targetY;
-                }
-                else if (IsInBounds(targetX + 1, targetY) && grid[targetX + 1, targetY])
-                {
-                    // Check below
-                    currentX = targetX + 1;
-                    currentY = targetY;
+                    if (IsInBounds(targetX - i, targetY) && grid[targetX - i, targetY])
+                    {
+                        // Check right
+                        currentX = targetX - i;
+                        currentY = targetY;
+                        break;
+                    }
+                    else if (IsInBounds(targetX + i, targetY) && grid[targetX + i, targetY])
+                    {
+                        // Check below
+                        currentX = targetX + i;
+                        currentY = targetY;
+                        break;
+                    }
                 }
                 break;
 
             case "left":
-                if (IsInBounds(targetX, targetY - 1) && grid[targetX, targetY - 1])
+                for (int i = 0; i < gridSizeY; i++)
                 {
-                    // Check below
-                    currentX = targetX;
-                    currentY = targetY - 1;
+                    if (IsInBounds(targetX, targetY - i) && grid[targetX, targetY - i])
+                    {
+                        // Check below
+                        currentX = targetX;
+                        currentY = targetY - i;
+                        break;
+                    }
+                    else if (IsInBounds(targetX, targetY + i) && grid[targetX, targetY + i])
+                    {
+                        // Check above
+                        currentX = targetX;
+                        currentY = targetY + i;
+                        break;
+                    }
                 }
-                else if (IsInBounds(targetX, targetY + 1) && grid[targetX, targetY + 1])
-                {
-                    // Check above
-                    currentX = targetX;
-                    currentY = targetY + 1;
-                }
+
                 break;
 
             case "right":
-                if (IsInBounds(targetX, targetY - 1) && grid[targetX, targetY - 1])
+                for (int i = 0; i < gridSizeY; i++)
                 {
-                    // Check above
-                    currentX = targetX;
-                    currentY = targetY - 1;
+                    if (IsInBounds(targetX, targetY - i) && grid[targetX, targetY - i])
+                    {
+                        // Check above
+                        currentX = targetX;
+                        currentY = targetY - i;
+                        break;
+                    }
+                    else if (IsInBounds(targetX, targetY + i) && grid[targetX, targetY + i])
+                    {
+                        // Check below
+                        currentX = targetX;
+                        currentY = targetY + i;
+                        break;
+                    }
                 }
-                else if (IsInBounds(targetX, targetY + 1) && grid[targetX, targetY + 1])
-                {
-                    // Check below
-                    currentX = targetX;
-                    currentY = targetY + 1;
-                }
+
                 break;
         }
         
@@ -316,6 +485,10 @@ public class UIPlayer : MonoBehaviour
                     {
                         sr2.color = Color.red; // Highlight selected position
                     }
+                    else if(playerAbilities.Count < 9 && j == 2)
+                    {
+                        sr2.color = Color.black;
+                    }
                     else
                     {
                         sr2.color = Color.green;
@@ -327,5 +500,31 @@ public class UIPlayer : MonoBehaviour
             }
         }
         
+    }
+    
+    private static Entity FindPlayer()
+    {
+        // You could search for the player in the scene here, or have a reference.
+        // This is just an example of how you might find the player.
+        GameObject playerObject = GameObject.FindWithTag("Player");
+        if (playerObject != null)
+        {
+            return playerObject.GetComponent<Entity>();
+        }
+
+        return null;
+    }
+    
+    private static Entity EnemyFind()
+    {
+        // You could search for the player in the scene here, or have a reference.
+        // This is just an example of how you might find the player.
+        GameObject enemyObject = GameObject.FindWithTag("Enemy");
+        if (enemyObject != null)
+        {
+            return enemyObject.GetComponent<Entity>();
+        }
+
+        return null;
     }
 }
